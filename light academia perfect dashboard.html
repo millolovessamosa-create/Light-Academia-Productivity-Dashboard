@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Light Academia Study Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  body {
+    margin: 0;
+    font-family: 'Playfair Display', serif;
+    color: white;
+    background: #d8c3a5; /* Tan default background */
+    background-size: cover;
+    background-position: center;
+    transition: background 0.5s ease-in-out;
+  }
+  #overlay {
+    position: fixed; top:0; left:0; right:0; bottom:0;
+    background: rgba(0,0,0,0.7);
+    display:flex; align-items:center; justify-content:center;
+    z-index:9999; cursor:pointer; flex-direction:column;
+    font-size:1.5em; text-align:center;
+  }
+  header { display:none; } /* Hide header to focus on timer */
+  main { display:flex; min-height:100vh; }
+  aside { width:250px; background: rgba(0,0,0,0.6); padding:20px; box-shadow:2px 0 6px rgba(0,0,0,0.2); color:white; }
+  section { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+  #timer { font-size:6em; font-weight:600; margin:0; text-shadow: 2px 2px 6px rgba(0,0,0,0.7);}
+  .controls { margin-top:20px; display:flex; flex-direction:column; gap:10px; width:200px; }
+  .controls button, .sidebar-btn { padding:10px; font-size:1em; border:none; border-radius:10px; cursor:pointer; background:rgba(255,255,255,0.8); color:#3b2f2f; transition:all 0.3s; }
+  .controls button:hover, .sidebar-btn:hover { background:rgba(255,255,255,1); }
+  .time-settings { display:flex; flex-direction:column; margin-bottom:10px; }
+  .time-input { padding:6px; border-radius:6px; border:none; font-size:1em; }
+  .focus-friend { position: fixed; bottom:10px; right:10px; width:200px; opacity:0.9; }
+</style>
+</head>
+<body>
+
+<div id="overlay">Click anywhere to unlock audio & activate dashboard</div>
+
+<main>
+  <aside>
+    <div class="backgrounds">
+      <h3>Backdrops</h3>
+      <button class="sidebar-btn" onclick="setBackground('library.jpg')">Library</button>
+      <button class="sidebar-btn" onclick="setBackground('cafe.jpg')">Cafe</button>
+      <button class="sidebar-btn" onclick="setBackground('fire.jpg')">Fire</button>
+      <input type="file" accept="image/*" onchange="uploadBackground(event)">
+    </div>
+
+    <div class="sounds" style="margin-top:20px;">
+      <h3>Ambient Sounds</h3>
+      <button class="sidebar-btn" onclick="playSound('murmur')">Murmuring</button>
+      <button class="sidebar-btn" onclick="playSound('fire')">Fire</button>
+      <button class="sidebar-btn" onclick="playSound('rain')">Rain</button>
+      <button class="sidebar-btn" onclick="stopAllSounds()">Stop</button>
+      <input type="file" accept="audio/*" onchange="uploadAudio(event)">
+    </div>
+  </aside>
+
+  <section>
+    <h1 id="timer">25:00</h1>
+    <div class="controls">
+      <div class="time-settings">
+        <input type="number" id="customMinutes" class="time-input" placeholder="Minutes">
+        <button onclick="setCustomPomodoro()">Set Timer</button>
+      </div>
+      <button onclick="startPomodoro()">Start</button>
+      <button onclick="resetPomodoro()">Reset</button>
+    </div>
+  </section>
+</main>
+
+<img src="focus.gif" alt="Focus Friend" class="focus-friend">
+
+<!-- Preloaded audio elements -->
+<audio id="murmur" src="murmur.mp3" loop></audio>
+<audio id="fire" src="fire.mp3" loop></audio>
+<audio id="rain" src="rain.mp3" loop></audio>
+<audio id="bell" src="bell.mp3"></audio>
+
+<script>
+// AUDIO UNLOCK
+let unlocked = false;
+const overlay = document.getElementById("overlay");
+const sounds = {
+  murmur: document.getElementById("murmur"),
+  fire: document.getElementById("fire"),
+  rain: document.getElementById("rain")
+};
+Object.values(sounds).forEach(s => s.loop = true);
+
+async function unlockAudio() {
+  if (unlocked) return;
+
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const buffer = audioCtx.createBuffer(1, 1, 22050);
+  const source = audioCtx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(audioCtx.destination);
+  source.start(0);
+
+  Object.values(sounds).forEach(s => s.play().then(()=>s.pause()).catch(()=>{}));
+
+  unlocked = true;
+  overlay.style.display = "none";
+}
+
+overlay.addEventListener("click", unlockAudio);
+
+// BACKGROUNDS
+function setBackground(file){ document.body.style.backgroundImage=`url('${file}')`; }
+function uploadBackground(event){
+  const file=event.target.files[0];
+  if(file){
+    const reader=new FileReader();
+    reader.onload=e=>document.body.style.backgroundImage=`url('${e.target.result}')`;
+    reader.readAsDataURL(file);
+  }
+}
+
+// POMODORO TIMER
+let timer; let timeLeft=25*60;
+function updateDisplay(){ 
+  const m=Math.floor(timeLeft/60), s=timeLeft%60;
+  document.getElementById("timer").textContent=`${m}:${s.toString().padStart(2,'0')}`;
+}
+function setCustomPomodoro(){
+  const minutes=parseInt(document.getElementById("customMinutes").value);
+  if(!isNaN(minutes)&&minutes>0){ clearInterval(timer); timer=null; timeLeft=minutes*60; updateDisplay(); }
+  else alert("Enter valid minutes.");
+}
+function startPomodoro(){
+  if(timer) return;
+  timer=setInterval(()=>{
+    if(timeLeft>0){ timeLeft--; updateDisplay(); }
+    else{ clearInterval(timer); timer=null; document.getElementById("bell").play(); alert("Pomodoro complete!"); }
+  },1000);
+}
+function resetPomodoro(){ clearInterval(timer); timer=null; timeLeft=25*60; updateDisplay(); }
+updateDisplay();
+
+// SOUNDS
+function stopAllSounds(){ Object.values(sounds).forEach(s => {s.pause(); s.currentTime = 0;}); }
+function playSound(name){ 
+  if(!unlocked){alert("Click overlay first to unlock audio!"); return;}
+  stopAllSounds();
+  const s = sounds[name];
+  s.currentTime = 0;
+  s.play().catch(()=>{alert("Tap page to allow audio");});
+}
+
+// CUSTOM AUDIO UPLOAD
+function uploadAudio(event){
+  const file=event.target.files[0];
+  if(file){
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const a = new Audio(e.target.result);
+      a.loop = true;
+      a.play().catch(()=>{alert("Tap page to allow audio");});
+    };
+    reader.readAsDataURL(file);
+  }
+}
+</script>
+</body>
+</html>
